@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SONIC PRISM // 2026 Holographic Concert Ticket</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    * { user-select: none; -webkit-user-select: none; box-sizing: border-box; }
+    body, html {
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      background-color: #090a0f;
+      color: #f4f4f6;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    canvas#stage {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: grab;
+      touch-action: none;
+    }
+    canvas#stage:active {
+      cursor: grabbing;
+    }
+    .glass-panel {
+      background: rgba(18, 20, 28, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+    }
+    .holo-badge {
+      background: linear-gradient(125deg, #ff3e9d, #00e5ff, #ffe600, #a855f7, #ff3e9d);
+      background-size: 300% 300%;
+      animation: holoShift 6s ease infinite;
+    }
+    @keyframes holoShift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    .btn-action {
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-action:hover {
+      transform: translateY(-1px);
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.28);
+    }
+    .btn-action:active {
+      transform: translateY(1px) scale(0.98);
+    }
+  </style>
+</head>
+<body class="relative">
+
+  <!-- Ambient Studio Background Glow -->
+  <div class="pointer-events-none fixed inset-0 overflow-hidden z-0">
+    <div id="ambientLight1" class="absolute -top-32 left-1/4 w-[520px] h-[520px] rounded-full opacity-20 blur-[130px]"
+         style="background: radial-gradient(circle, #00f0ff 0%, #7928ca 60%, transparent 100%);"></div>
+    <div id="ambientLight2" class="absolute -bottom-40 right-1/4 w-[580px] h-[580px] rounded-full opacity-15 blur-[140px]"
+         style="background: radial-gradient(circle, #ff0080 0%, #ffcc00 65%, transparent 100%);"></div>
+  </div>
+
+  <!-- Top HUD Bar -->
+  <header class="fixed top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+    <div class="glass-panel rounded-2xl px-4 py-2.5 flex items-center gap-3.5 pointer-events-auto">
+      <div class="w-2.5 h-2.5 rounded-full holo-badge shadow-[0_0_12px_#00e5ff]"></div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold tracking-widest uppercase text-cyan-300">SONIC PRISM // 2026</span>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/80 font-mono">VIP ADMIT ONE</span>
+        </div>
+        <p class="text-xs text-zinc-400 mt-0.5">
+          拖曳票身可<span class="text-zinc-200 font-medium">彎曲折疊</span>並折射全息雷射膜；拉扯右側裁切線或刷過虛線即可<span class="text-amber-300 font-medium">逐根纖維撕開</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Telemetry & Status -->
+    <div class="glass-panel rounded-2xl px-4 py-2.5 flex items-center gap-5 pointer-events-auto">
+      <div class="flex flex-col">
+        <span class="text-xs text-zinc-400">纖維完整度 (Fibers)</span>
+        <div class="flex items-center gap-2 mt-0.5">
+          <div class="w-28 h-2 rounded-full bg-zinc-800 overflow-hidden border border-white/10">
+            <div id="fiberBar" class="h-full holo-badge transition-all duration-75" style="width: 100%;"></div>
+          </div>
+          <span id="fiberText" class="text-xs font-mono font-bold text-white w-12 text-right">36/36</span>
+        </div>
+      </div>
+
+      <div class="h-7 w-px bg-white/10"></div>
+
+      <div class="flex flex-col">
+        <span class="text-xs text-zinc-400">即時音效合成 (WebAudio)</span>
+        <div class="flex items-center gap-2 mt-0.5">
+          <canvas id="audioScope" width="90" height="22" class="rounded bg-black/40 border border-white/10"></canvas>
+          <span id="audioStatus" class="text-xs font-mono text-emerald-400">READY</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Interactive Physics Canvas -->
+  <canvas id="stage" class="relative z-10"></canvas>
+
+  <!-- Bottom Control Bar -->
+  <footer class="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 pointer-events-none flex items-center gap-2.5 flex-wrap justify-center w-full max-w-3xl px-4">
+    <div class="glass-panel rounded-2xl p-2 flex items-center gap-2 pointer-events-auto flex-wrap justify-center">
+      
+      <!-- Mode Switcher -->
+      <div class="flex items-center bg-black/40 rounded-xl p-1 border border-white/10">
+        <button id="modeGripBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-white/15 text-white shadow-sm flex items-center gap-1.5">
+          <span>🖐️</span> 抓握與彎折 (Grip &amp; Tear)
+        </button>
+        <button id="modeSliceBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-zinc-400 hover:text-white flex items-center gap-1.5">
+          <span>✂️</span> 刀鋒劃破模式 (Blade Tear)
+        </button>
+      </div>
+
+      <div class="h-6 w-px bg-white/10 mx-0.5"></div>
+
+      <!-- Actions -->
+      <button id="flipBtn" class="btn-action px-3.5 py-2 rounded-xl bg-white/8 border border-white/12 text-xs font-medium text-zinc-100 flex items-center gap-1.5">
+        <span>🔄</span> 翻轉正反面 (<kbd class="text-xs opacity-75 font-mono">F</kbd>)
+      </button>
+
+      <button id="autoTearBtn" class="btn-action px-3.5 py-2 rounded-xl bg-amber-500/15 border border-amber-400/30 text-xs font-medium text-amber-200 flex items-center gap-1.5">
+        <span>⚡</span> 示範慢速撕票 (<kbd class="text-xs opacity-75 font-mono">T</kbd>)
+      </button>
+
+      <button id="resetBtn" class="btn-action px-3.5 py-2 rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-xs font-medium text-cyan-200 flex items-center gap-1.5">
+        <span>✨</span> 全新票券 (<kbd class="text-xs opacity-75 font-mono">R</kbd>)
+      </button>
+
+      <button id="muteBtn" class="btn-action px-3 py-2 rounded-xl bg-white/8 border border-white/12 text-xs font-medium text-zinc-200 flex items-center gap-1" title="切換音效">
+        <span id="muteIcon">🔊</span>
+      </button>
+    </div>
+  </footer>
+
+  <script>
+    // ============================================================================
+    // 1. PROCEDURAL WEB AUDIO SYNTHESIZER (Zero External Assets)
+    //    Synthesizes:
+    //    - Individual paper fiber snap/pop (micro-impulse + formants + noise burst)
+    //    - Paper flexing / crinkling friction (bandpass modulated pink/brown noise)
+    //    - Holographic foil shimmer subtle harmonic hum on high curvature
+    //    - Celebratory chord chime when stub is completely torn off
+    // ============================================================================
+    class ProceduralTicketAudio {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+        this.noiseBuffer = null;
+        this.pinkBuffer = null;
+        this.analyser = null;
+        this.freqData = null;
+        this.crinkleGain = null;
+        this.crinkleFilter = null;
+        this.lastBendEnergy = 0;
+      }
+
+      init() {
+        if (this.ctx) {
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          return;
+        }
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioCtx();
+
+        // Master compressor & analyser for oscilloscope HUD
+        this.compressor = this.ctx.createDynamicsCompressor();
+        this.compressor.threshold.value = -14;
+        this.compressor.knee.value = 12;
+        this.compressor.ratio.value = 4;
+        this.compressor.attack.value = 0.002;
+        this.compressor.release.value = 0.12;
+
+        this.analyser = this.ctx.createAnalyser();
+        this.analyser.fftSize = 128;
+        this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
+
+        this.compressor.connect(this.analyser);
+        this.analyser.connect(this.ctx.destination);
+
+        // Pre-compute 2 seconds of crisp white & pink-ish noise buffer
+        const sr = this.ctx.sampleRate;
+        this.noiseBuffer = this.ctx.createBuffer(1, sr * 2, sr);
+        this.pinkBuffer = this.ctx.createBuffer(1, sr * 2, sr);
+        const white = this.noiseBuffer.getChannelData(0);
+        const pink = this.pinkBuffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < sr * 2; i++) {
+          const w = Math.random() * 2 - 1;
+          white[i] = w;
+          b0 = 0.99886 * b0 + w * 0.0555179;
+          b1 = 0.99332 * b1 + w * 0.0750759;
+          b2 = 0.96900 * b2 + w * 0.1538520;
+          b3 = 0.86650 * b3 + w * 0.3104856;
+          b4 = 0.55000 * b4 + w * 0.5329522;
+          b5 = -0.7616 * b5 - w * 0.0168980;
+          pink[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.045;
+          b6 = w * 0.115926;
+        }
+
+        // Continuous paper crinkle loop modulated by bending velocity
+        const crinkleSrc = this.ctx.createBufferSource();
+        crinkleSrc.buffer = this.pinkBuffer;
+        crinkleSrc.loop = true;
+
+        this.crinkleFilter = this.ctx.createBiquadFilter();
+        this.crinkleFilter.type = 'bandpass';
+        this.crinkleFilter.frequency.value = 1600;
+        this.crinkleFilter.Q.value = 2.4;
+
+        this.crinkleGain = this.ctx.createGain();
+        this.crinkleGain.gain.value = 0.0;
+
+        crinkleSrc.connect(this.crinkleFilter);
+        this.crinkleFilter.connect(this.crinkleGain);
+        this.crinkleGain.connect(this.compressor);
+        crinkleSrc.start();
+
+        const statusEl = document.getElementById('audioStatus');
+        if (statusEl) statusEl.textContent = 'ACTIVE';
+      }
+
+      /**
+       * Triggered each time a single perforation fiber snaps!
+       * @param {number} progress 0..1 ratio of how many fibers are already torn (zipper pitch rise)
+       * @param {number} tension强度 0.5..2.0
+       */
+      playFiberSnap(progress = 0.5, tension = 1.0) {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+
+        // 1. Crisp fibrous noise tear grain (18ms - 38ms)
+        const noiseSrc = this.ctx.createBufferSource();
+        noiseSrc.buffer = this.noiseBuffer;
+        // Random offset into noise buffer
+        const offset = Math.random() * 1.5;
+
+        // Rising formant frequency as the tear zips down the perforation line
+        const baseFreq = 1600 + progress * 2400 + (Math.random() - 0.5) * 450;
+
+        const bp = this.ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(baseFreq, now);
+        bp.frequency.exponentialRampToValueAtTime(baseFreq * 0.58, now + 0.032);
+        bp.Q.value = 3.2 + Math.random() * 2.5;
+
+        const hp = this.ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = 700;
+
+        const env = this.ctx.createGain();
+        const peak = Math.min(0.65, (0.28 + Math.random() * 0.16) * tension);
+        env.gain.setValueAtTime(0.0001, now);
+        env.gain.linearRampToValueAtTime(peak, now + 0.0018);
+        env.gain.exponentialRampToValueAtTime(0.0008, now + 0.026 + Math.random() * 0.015);
+
+        noiseSrc.connect(bp);
+        bp.connect(hp);
+        hp.connect(env);
+        env.connect(this.compressor);
+
+        noiseSrc.start(now, offset, 0.05);
+
+        // 2. Micro-pop body resonance of heavy 350gsm cardstock snapping
+        const osc = this.ctx.createOscillator();
+        osc.type = 'triangle';
+        const popFreq = 310 + progress * 260 + Math.random() * 90;
+        osc.frequency.setValueAtTime(popFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(75, now + 0.016);
+
+        const popGain = this.ctx.createGain();
+        popGain.gain.setValueAtTime(0.18 * tension, now);
+        popGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.017);
+
+        osc.connect(popGain);
+        popGain.connect(this.compressor);
+        osc.start(now);
+        osc.stop(now + 0.019);
+      }
+
+      /**
+       * Modulate continuous paper flex sound based on cloth angular velocity & strain
+       */
+      updateBendCrinkle(bendSpeed, curvature) {
+        if (!this.ctx || this.muted) return;
+        const now = this.ctx.currentTime;
+        // Crackle bursts when paper bends rapidly
+        const targetGain = Math.min(0.14, Math.pow(bendSpeed, 1.3) * 0.035);
+        this.crinkleGain.gain.setTargetAtTime(targetGain, now, 0.025);
+        const targetFreq = 900 + Math.min(3200, curvature * 1800 + bendSpeed * 400);
+        this.crinkleFilter.frequency.setTargetAtTime(targetFreq, now, 0.03);
+      }
+
+      /**
+       * Subtle acoustic whoosh when flipping the ticket 180 deg
+       */
+      playFlipWhoosh() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const src = this.ctx.createBufferSource();
+        src.buffer = this.pinkBuffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.Q.value = 1.8;
+        filter.frequency.setValueAtTime(320, now);
+        filter.frequency.exponentialRampToValueAtTime(1450, now + 0.14);
+        filter.frequency.exponentialRampToValueAtTime(280, now + 0.32);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.28, now + 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.0005, now + 0.34);
+
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.compressor);
+        src.start(now, 0, 0.36);
+      }
+
+      /**
+       * Satisfying final release snap when the last fiber tears off
+       */
+      playTearComplete() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5]; // C5 major 9th shimmer
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.035);
+
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.0001, now + idx * 0.035);
+          gain.gain.linearRampToValueAtTime(0.06, now + idx * 0.035 + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.035 + 0.9);
+
+          osc.connect(gain);
+          gain.connect(this.compressor);
+          osc.start(now + idx * 0.035);
+          osc.stop(now + idx * 0.035 + 0.95);
+        });
+      }
+    }
+
+    const sound = new ProceduralTicketAudio();
+
+    // ============================================================================
+    // 2. HIGH-RESOLUTION TICKET ARTWORK & HOLOGRAPHIC MASK TEXTURE GENERATOR
+    //    Generates Front Face, Back Face, and Holographic Iridescence Mask
+    //    at 2x Retina resolution on offscreen canvases.
+    // ============================================================================
+    const TEX_W = 1360;
+    const TEX_H = 560;
+    const PERF_U = 0.722222; // Col 13 out of 18 columns (13 / 18 = 0.7222)
+
+    function createTicketTextures() {
+      const frontCanvas = document.createElement('canvas');
+      const backCanvas = document.createElement('canvas');
+      const holoMaskCanvas = document.createElement('canvas');
+      frontCanvas.width = backCanvas.width = holoMaskCanvas.width = TEX_W;
+      frontCanvas.height = backCanvas.height = holoMaskCanvas.height = TEX_H;
+
+      const fctx = frontCanvas.getContext('2d');
+      const bctx = backCanvas.getContext('2d');
+      const hctx = holoMaskCanvas.getContext('2d');
+
+      const perfX = TEX_W * PERF_U;
+
+      // -------------------------------------------------------------------------
+      // A. FRONT TEXTURE (Dark Obsidian Luxury Cardstock + Concert Artwork)
+      // -------------------------------------------------------------------------
+      const bgGrad = fctx.createLinearGradient(0, 0, TEX_W, TEX_H);
+      bgGrad.addColorStop(0, '#0d0f18');
+      bgGrad.addColorStop(0.55, '#131624');
+      bgGrad.addColorStop(0.72, '#171a2b');
+      bgGrad.addColorStop(1, '#10121d');
+      fctx.fillStyle = bgGrad;
+      fctx.fillRect(0, 0, TEX_W, TEX_H);
+
+      // Subtle cardstock paper grain texture
+      fctx.save();
+      fctx.fillStyle = 'rgba(255,255,255,0.018)';
+      for (let i = 0; i < 6500; i++) {
+        const rx = Math.random() * TEX_W;
+        const ry = Math.random() * TEX_H;
+        fctx.fillRect(rx, ry, 1.5, 1.5);
+      }
+      fctx.restore();
+
+      // Decorative Guilloche / Soundwave Interference Lines across main body
+      fctx.save();
+      fctx.strokeStyle = 'rgba(120, 210, 255, 0.08)';
+      fctx.lineWidth = 1.4;
+      for (let w = 0; w < 18; w++) {
+        fctx.beginPath();
+        for (let x = 20; x < perfX - 20; x += 8) {
+          const y = TEX_H * 0.52 +
+            Math.sin(x * 0.012 + w * 0.32) * (55 + w * 6) +
+            Math.cos(x * 0.027 - w * 0.2) * 28;
+          if (x === 20) fctx.moveTo(x, y);
+          else fctx.lineTo(x, y);
+        }
+        fctx.stroke();
+      }
+      fctx.restore();
+
+      // Outer framing border with metallic gold/silver hairline
+      fctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      fctx.lineWidth = 3;
+      fctx.strokeRect(22, 22, perfX - 40, TEX_H - 44);
+      fctx.strokeRect(perfX + 18, 22, TEX_W - perfX - 40, TEX_H - 44);
+
+      // Left vertical holographic security strip
+      const stripGrad = fctx.createLinearGradient(0, 0, 0, TEX_H);
+      stripGrad.addColorStop(0, '#00f2fe');
+      stripGrad.addColorStop(0.5, '#d946ef');
+      stripGrad.addColorStop(1, '#facc15');
+      fctx.fillStyle = stripGrad;
+      fctx.fillRect(42, 22, 34, TEX_H - 44);
+
+      fctx.save();
+      fctx.translate(64, TEX_H / 2);
+      fctx.rotate(-Math.PI / 2);
+      fctx.fillStyle = '#090a10';
+      fctx.font = '900 17px monospace';
+      fctx.textAlign = 'center';
+      fctx.fillText('AUTHENTIC HOLOGRAM FOIL // SECURE PASS 2026', 0, 0);
+      fctx.restore();
+
+      // Central Prism Emblem (Geometric Synthwave Sun / Acoustic Prism)
+      const cx = 695, cy = 265;
+      fctx.save();
+      // Concentric orbital rings
+      fctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
+      fctx.lineWidth = 2;
+      [155, 122, 88].forEach((r, idx) => {
+        fctx.beginPath();
+        fctx.setLineDash(idx === 1 ? [8, 6] : []);
+        fctx.arc(cx, cy, r, 0, Math.PI * 2);
+        fctx.stroke();
+      });
+      fctx.setLineDash([]);
+
+      // Triangle Prism inside emblem
+      fctx.beginPath();
+      fctx.moveTo(cx, cy - 102);
+      fctx.lineTo(cx + 92, cy + 62);
+      fctx.lineTo(cx - 92, cy + 62);
+      fctx.closePath();
+      fctx.strokeStyle = '#ffffff';
+      fctx.lineWidth = 5;
+      fctx.stroke();
+      fctx.fillStyle = 'rgba(255,255,255,0.06)';
+      fctx.fill();
+
+      // Inner dispersion rays
+      for (let i = -3; i <= 3; i++) {
+        fctx.beginPath();
+        fctx.moveTo(cx, cy - 10);
+        fctx.lineTo(cx + i * 38, cy + 125);
+        fctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        fctx.lineWidth = 2.5;
+        fctx.stroke();
+      }
+      fctx.restore();
+
+      // Tour Header & Main Typography
+      fctx.fillStyle = '#38bdf8';
+      fctx.font = '700 20px sans-serif';
+      fctx.fillText('ASTRAL RESONANCE WORLD TOUR // TAIPEI DOME', 104, 78);
+
+      fctx.fillStyle = '#ffffff';
+      fctx.font = '900 78px sans-serif';
+      fctx.fillText('SONIC PRISM', 100, 165);
+
+      fctx.fillStyle = 'rgba(255,255,255,0.85)';
+      fctx.font = '700 30px monospace';
+      fctx.fillText('LIVE IN HYPER-ACOUSTIC 360°', 104, 212);
+
+      // Event Info Grid Boxes
+      const infoY = 310;
+      fctx.fillStyle = 'rgba(255,255,255,0.05)';
+      fctx.fillRect(104, infoY, 415, 118);
+      fctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      fctx.lineWidth = 1.5;
+      fctx.strokeRect(104, infoY, 415, 118);
+
+      fctx.fillStyle = '#94a3b8';
+      fctx.font = '600 16px monospace';
+      fctx.fillText('DATE & TIME', 124, infoY + 32);
+      fctx.fillText('GATE / ZONE', 325, infoY + 32);
+
+      fctx.fillStyle = '#f8fafc';
+      fctx.font = '800 28px monospace';
+      fctx.fillText('OCT 23, 2026', 124, infoY + 68);
+      fctx.fillText('GATE A // PIT', 325, infoY + 68);
+
+      fctx.fillStyle = '#38bdf8';
+      fctx.font = '700 18px monospace';
+      fctx.fillText('DOORS 18:30 • SHOW 20:00', 124, infoY + 100);
+      fctx.fillStyle = '#f472b6';
+      fctx.fillText('STANDING VIP', 325, infoY + 100);
+
+      // Bottom Serial & Foil Seal Stamp
+      fctx.fillStyle = 'rgba(255,255,255,0.6)';
+      fctx.font = '600 18px monospace';
+      fctx.fillText('NO. SP-2026-884920-TW   •   350GSM HOLOGRAPHIC LAMINATE', 104, 495);
+
+      // -------------------------------------------------------------------------
+      // RIGHT STUB (Tear-off Keepsake Stub)
+      // -------------------------------------------------------------------------
+      const stubX = perfX + 42;
+      fctx.fillStyle = '#f472b6';
+      fctx.font = '800 20px monospace';
+      fctx.fillText('ADMIT ONE // VIP STUB', stubX, 74);
+
+      fctx.fillStyle = '#ffffff';
+      fctx.font = '900 42px sans-serif';
+      fctx.fillText('ROW 01', stubX, 130);
+      fctx.fillStyle = '#38bdf8';
+      fctx.font = '900 46px monospace';
+      fctx.fillText('SEAT 08', stubX, 184);
+
+      // Stub Holographic Seal Badge
+      fctx.beginPath();
+      fctx.arc(stubX + 215, 132, 46, 0, Math.PI * 2);
+      fctx.fillStyle = 'rgba(255,255,255,0.12)';
+      fctx.fill();
+      fctx.lineWidth = 3;
+      fctx.strokeStyle = '#ffffff';
+      fctx.stroke();
+      fctx.fillStyle = '#ffffff';
+      fctx.font = '800 15px monospace';
+      fctx.textAlign = 'center';
+      fctx.fillText('PRISM', stubX + 215, 128);
+      fctx.fillText('VIP 26', stubX + 215, 148);
+      fctx.textAlign = 'left';
+
+      fctx.fillStyle = '#94a3b8';
+      fctx.font = '600 17px monospace';
+      fctx.fillText('DATE: 2026.10.23', stubX, 240);
+      fctx.fillText('PRICE: NT$ 6,800', stubX, 268);
+      fctx.fillText('REF: #TW-884920', stubX, 296);
+
+      // High-Contrast Crisp Barcode on Stub
+      const bcY = 335, bcW = 270, bcH = 115;
+      fctx.fillStyle = '#f8fafc';
+      fctx.fillRect(stubX, bcY, bcW, bcH);
+      fctx.fillStyle = '#090a0f';
+      let bx = stubX + 14;
+      const seedBars = [4,2,6,2,3,5,2,2,6,3,2,4,2,6,2,3,2,5,4,2,3,6,2,2,4,5,2,3,2,6,3,2,4];
+      for (let i = 0; i < seedBars.length && bx < stubX + bcW - 16; i++) {
+        const w = seedBars[i] * 2.1;
+        if (i % 2 === 0) {
+          fctx.fillRect(bx, bcY + 12, w, bcH - 36);
+        }
+        bx += w + 2.5;
+      }
+      fctx.font = '700 16px monospace';
+      fctx.textAlign = 'center';
+      fctx.fillText('* SP - 2026 - 884920 *', stubX + bcW / 2, bcY + bcH - 7);
+      fctx.textAlign = 'left';
+
+      fctx.fillStyle = 'rgba(255, 210, 100, 0.85)';
+      fctx.font = '700 16px sans-serif';
+      fctx.fillText('✂ 沿虛線撕開存根 (TEAR HERE)', stubX, 495);
+
+      // -------------------------------------------------------------------------
+      // B. HOLOGRAPHIC FOIL MASK TEXTURE (Defines where rainbow diffraction shines)
+      // -------------------------------------------------------------------------
+      hctx.fillStyle = '#141414'; // Base subtle sheen across the laminated cardstock
+      hctx.fillRect(0, 0, TEX_W, TEX_H);
+
+      // 1. Security Strip (100% intense diffraction foil)
+      hctx.fillStyle = '#ffffff';
+      hctx.fillRect(42, 22, 34, TEX_H - 44);
+
+      // 2. Border frames & Guilloche waves (65% foil)
+      hctx.strokeStyle = '#b8b8b8';
+      hctx.lineWidth = 4;
+      hctx.strokeRect(22, 22, perfX - 40, TEX_H - 44);
+      hctx.strokeRect(perfX + 18, 22, TEX_W - perfX - 40, TEX_H - 44);
+
+      // 3. Central Prism & Sonic Rings (100% foil)
+      hctx.save();
+      hctx.strokeStyle = '#ffffff';
+      hctx.lineWidth = 6;
+      [155, 122, 88].forEach(r => {
+        hctx.beginPath();
+        hctx.arc(cx, cy, r, 0, Math.PI * 2);
+        hctx.stroke();
+      });
+      hctx.beginPath();
+      hctx.moveTo(cx, cy - 102);
+      hctx.lineTo(cx + 92, cy + 62);
+      hctx.lineTo(cx - 92, cy + 62);
+      hctx.closePath();
+      hctx.fillStyle = '#d8d8d8';
+      hctx.fill();
+      hctx.stroke();
+      hctx.restore();
+
+      // 4. Main Headline "SONIC PRISM" Foil Stamping
+      hctx.fillStyle = '#ffffff';
+      hctx.font = '900 78px sans-serif';
+      hctx.fillText('SONIC PRISM', 100, 165);
+
+      // 5. Stub VIP Seal & Row/Seat Foil
+      hctx.beginPath();
+      hctx.arc(stubX + 215, 132, 46, 0, Math.PI * 2);
+      hctx.fillStyle = '#ffffff';
+      hctx.fill();
+      hctx.font = '900 46px monospace';
+      hctx.fillText('SEAT 08', stubX, 184);
+
+      // 6. Repeating Diagonal Hologram Watermark Pattern across whole ticket
+      hctx.save();
+      hctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+      hctx.font = '800 18px monospace';
+      for (let y = -100; y < TEX_H + 100; y += 68) {
+        for (let x = -100; x < TEX_W + 100; x += 220) {
+          hctx.save();
+          hctx.translate(x + (y % 136), y);
+          hctx.rotate(-0.34);
+          hctx.fillText('✦ PRISM 26 ✦', 0, 0);
+          hctx.restore();
+        }
+      }
+      hctx.restore();
+
+      // -------------------------------------------------------------------------
+      // C. BACK FACE TEXTURE (Fine-Print Venue Map, Acoustic Specs & Foil Seal)
+      // -------------------------------------------------------------------------
+      const backGrad = bctx.createLinearGradient(0, 0, TEX_W, TEX_H);
+      backGrad.addColorStop(0, '#f5f3ef');
+      backGrad.addColorStop(1, '#e6e2d8');
+      bctx.fillStyle = backGrad;
+      bctx.fillRect(0, 0, TEX_W, TEX_H);
+
+      // Fine paper fibers on matte back side
+      bctx.fillStyle = 'rgba(20, 20, 30, 0.035)';
+      for (let i = 0; i < 5000; i++) {
+        bctx.fillRect(Math.random() * TEX_W, Math.random() * TEX_H, 2, 1);
+      }
+
+      // Back border
+      bctx.strokeStyle = '#1e293b';
+      bctx.lineWidth = 3;
+      bctx.strokeRect(22, 22, (1 - PERF_U) * TEX_W - 40, TEX_H - 44);
+      bctx.strokeRect((1 - PERF_U) * TEX_W + 18, 22, PERF_U * TEX_W - 40, TEX_H - 44);
+
+      // Note: On back face, u is mirrored horizontally so stub is on the left (0 .. 1-PERF_U)
+      const backMainX = (1 - PERF_U) * TEX_W + 55;
+      bctx.fillStyle = '#0f172a';
+      bctx.font = '900 34px sans-serif';
+      bctx.fillText('SONIC PRISM // ATTENDEE TERMS & ACOUSTIC GUIDE', backMainX, 85);
+
+      bctx.fillStyle = '#334155';
+      bctx.font = '600 19px sans-serif';
+      const rules = [
+        '1. 本票券採用 350gsm 雙向雷射光柵防偽卡紙印製，彎折票面可見全光譜動態干涉條紋。',
+        '2. 入場時請由驗票人員或親自沿虛線撕下副券（Stub），每根紙張纖維斷裂均具唯一物理特徵。',
+        '3. 演出現場配備 360° 沉浸式波場合成音場，建議攜帶高階降噪耳塞體驗全頻段動態。',
+        '4. 票根撕下後可作為限量收藏紀念，遺失或毀損恕不補發。'
+      ];
+      rules.forEach((line, idx) => {
+        bctx.fillText(line, backMainX, 145 + idx * 42);
+      });
+
+      // Back Venue Stage Diagram
+      bctx.strokeStyle = '#0f172a';
+      bctx.lineWidth = 2.5;
+      bctx.strokeRect(backMainX, 330, 520, 165);
+      bctx.fillStyle = '#0f172a';
+      bctx.fillRect(backMainX + 160, 348, 200, 38);
+      bctx.fillStyle = '#ffffff';
+      bctx.font = '800 17px monospace';
+      bctx.textAlign = 'center';
+      bctx.fillText('360° PRISM STAGE', backMainX + 260, 373);
+
+      bctx.strokeStyle = '#0284c7';
+      bctx.beginPath();
+      bctx.arc(backMainX + 260, 385, 85, 0.15 * Math.PI, 0.85 * Math.PI);
+      bctx.stroke();
+      bctx.fillStyle = '#0284c7';
+      bctx.fillText('★ YOUR VIP ZONE (PIT A)', backMainX + 260, 445);
+      bctx.textAlign = 'left';
+
+      // Back magnetic / metallic security stripe
+      bctx.fillStyle = '#1e293b';
+      bctx.fillRect(22, 95, (1 - PERF_U) * TEX_W - 40, 58);
+      bctx.fillStyle = '#94a3b8';
+      bctx.font = '700 18px monospace';
+      bctx.fillText('MAG-STRIPE // 884920-VIP', 48, 130);
+
+      bctx.fillStyle = '#334155';
+      bctx.font = '700 22px monospace';
+      bctx.fillText('KEEP THIS STUB', 58, 240);
+      bctx.font = '500 17px sans-serif';
+      bctx.fillText('副券背面防偽認證區', 58, 275);
+
+      return { frontCanvas, backCanvas, holoMaskCanvas };
+    }
+
+    const textures = createTicketTextures();
+
+    // ============================================================================
+    // 3. 3D CLOTH / CARDSTOCK PHYSICS & PER-FIBER PERFORATION SIMULATION
+    //    - Split into Left (Main Ticket) & Right (Stub) grids along Column 13
+    //    - Connected by 36 individual paper fibers (8 micro-fibers per row segment)
+    //    - Supports 3D bending, torsion, flipping, and sequential fiber ripping
+    // ============================================================================
+    const COLS = 18;
+    const ROWS = 7;
+    const PERF_COL = 13; // Column index of perforation line (13 / 18 = 0.7222)
+    const TICKET_W = 680;
+    const TICKET_H = 280;
+    const REST_DX = TICKET_W / COLS;
+    const REST_DY = TICKET_H / ROWS;
+
+    class PointMass {
+      constructor(x, y, z, u, v, side, col, row) {
+        this.x = x; this.y = y; this.z = z;
+        this.px = x; this.py = y; this.pz = z;
+        this.rx = x; this.ry = y; this.rz = z; // Ideal flat local coordinates
+        this.u = u; this.v = v;
+        this.side = side; // 'L' (main) or 'R' (stub)
+        this.col = col;
+        this.row = row;
+        this.nx = 0; this.ny = 0; this.nz = 1; // Vertex surface normal
+        this.sx = 0; this.sy = 0; this.scale = 1; // Projected 2D screen coords
+        // Jagged micro-offset for realistic torn paper edge
+        this.jagX = (row > 0 && row < ROWS) ? (Math.random() - 0.5) * 4.2 : 0;
+      }
+    }
+
+    class Simulation {
+      constructor() {
+        this.interactionMode = 'grip'; // 'grip' or 'slice'
+        this.flipped = false;
+        this.flipAngle = 0;       // Current smoothed angle (0 or Math.PI)
+        this.targetFlipAngle = 0;
+        this.autoTearActive = false;
+        this.celebratedTear = false;
+        this.tearSparks = [];     // Flying paper dust/fiber particles on snap
+        this.reset();
+      }
+
+      reset() {
+        this.leftGrid = [];
+        this.rightGrid = [];
+        this.allPoints = [];
+        this.constraints = [];
+        this.seamBridges = []; // The 8 structural bridges along the perforation
+        this.fibers = [];      // 36 individual visual + acoustic paper fibers
+        this.stubDetached = false;
+        this.celebratedTear = false;
+        this.autoTearActive = false;
+
+        // 1. Create Left Grid (0 .. PERF_COL)
+        for (let r = 0; r <= ROWS; r++) {
+          const rowArr = [];
+          for (let c = 0; c <= PERF_COL; c++) {
+            const u = c / COLS;
+            const v = r / ROWS;
+            const rx = (u - 0.5) * TICKET_W;
+            const ry = (v - 0.5) * TICKET_H;
+            const p = new PointMass(rx, ry, 0, u, v, 'L', c, r);
+            this. applyTargetTransform(p, true);
+            rowArr.push(p);
+            this.allPoints.push(p);
+          }
+          this.leftGrid.push(rowArr);
+        }
+
+        // 2. Create Right Grid (PERF_COL .. COLS)
+        for (let r = 0; r <= ROWS; r++) {
+          const rowArr = [];
+          for (let c = PERF_COL; c <= COLS; c++) {
+            const u = c / COLS;
+            const v = r / ROWS;
+            const rx = (u - 0.5) * TICKET_W;
+            const ry = (v - 0.5) * TICKET_H;
+            const p = new PointMass(rx, ry, 0, u, v, 'R', c, r);
+            this.applyTargetTransform(p, true);
+            rowArr.push(p);
+            this.allPoints.push(p);
+          }
+          this.rightGrid.push(rowArr);
+        }
+
+        // 3. Add Structural, Shear, and Bending Constraints for cardstock rigidity
+        const addGridConstraints = (grid, colsCount) => {
+          for (let r = 0; r <= ROWS; r++) {
+            for (let c = 0; c <= colsCount; c++) {
+              const p = grid[r][c];
+              // Structural
+              if (c < colsCount) this.addConstraint(p, grid[r][c + 1], 0.96);
+              if (r < ROWS) this.addConstraint(p, grid[r + 1][c], 0.96);
+              // Shear (diagonal)
+              if (c < colsCount && r < ROWS) {
+                this.addConstraint(p, grid[r + 1][c + 1], 0.85);
+                this.addConstraint(grid[r + 1][c], grid[r][c + 1], 0.85);
+              }
+              // Bending (2-hop & 3-hop for springy cardstock feel)
+              if (c + 2 <= colsCount) this.addConstraint(p, grid[r][c + 2], 0.72);
+              if (r + 2 <= ROWS) this.addConstraint(p, grid[r + 2][c], 0.72);
+              if (c + 3 <= colsCount) this.addConstraint(p, grid[r][c + 3], 0.48);
+            }
+          }
+        };
+
+        addGridConstraints(this.leftGrid, PERF_COL);
+        addGridConstraints(this.rightGrid, COLS - PERF_COL);
+
+        // 4. Create Perforation Seam Bridges & 36 Micro-Fibers along Col 13
+        const FIBERS_PER_ROW = 5; // 7 segments * 5 + 1 = 36 fibers
+        let fiberIdx = 0;
+        for (let r = 0; r <= ROWS; r++) {
+          const pL = this.leftGrid[r][PERF_COL];
+          const pR = this.rightGrid[r][0];
+          const bridge = {
+            r, pL, pR,
+            intact: true,
+            strain: 0,
+            // Cross-seam bending constraint to keep perforation flat until torn
+            bendL: this.leftGrid[r][PERF_COL - 1],
+            bendR: this.rightGrid[r][1],
+            bendRestDist: REST_DX * 2
+          };
+          this.seamBridges.push(bridge);
+
+          if (r < ROWS) {
+            for (let k = 0; k < FIBERS_PER_ROW; k++) {
+              const frac = k / FIBERS_PER_ROW;
+              this.fibers.push({
+                id: fiberIdx++,
+                r,
+                frac, // 0..1 interpolation between row r and row r+1
+                intact: true,
+                strain: 0,
+                fuzzLen: 5 + Math.random() * 6,
+                fuzzAngle: (Math.random() - 0.5) * 0.65
+              });
+            }
+          } else {
+            // Bottom edge terminal fiber
+            this.fibers.push({
+              id: fiberIdx++,
+              r: ROWS - 1,
+              frac: 1.0,
+              intact: true,
+              strain: 0,
+              fuzzLen: 6,
+              fuzzAngle: 0.1
+            });
+          }
+        }
+
+        this.updateFiberHUD();
+      }
+
+      addConstraint(a, b, stiffness) {
+        const dx = a.rx - b.rx;
+        const dy = a.ry - b.ry;
+        const dz = a.rz - b.rz;
+        this.constraints.push({
+          a, b,
+          rest: Math.hypot(dx, dy, dz),
+          stiffness
+        });
+      }
+
+      applyTargetTransform(p, instant = false) {
+        const cosA = Math.cos(this.flipAngle);
+        const sinA = Math.sin(this.flipAngle);
+        const tx = p.rx * cosA;
+        const ty = p.ry;
+        const tz = p.rx * sinA;
+        if (instant) {
+          p.x = p.px = tx;
+          p.y = p.py = ty;
+          p.z = p.pz = tz;
+        }
+        return { tx, ty, tz };
+      }
+
+      flipTicket() {
+        this.flipped = !this.flipped;
+        this.targetFlipAngle += Math.PI;
+        sound.playFlipWhoosh();
+      }
+
+      /**
+       * Snap a specific fiber and spawn microscopic paper dust particles + sound
+       */
+      snapFiber(fiber, tension = 1.0) {
+        if (!fiber.intact) return;
+        fiber.intact = false;
+
+        // Calculate 3D world position of the snapping fiber for spark emission
+        const b0 = this.seamBridges[fiber.r];
+        const b1 = this.seamBridges[fiber.r + 1];
+        const t = fiber.frac;
+        const fx = (1 - t) * 0.5 * (b0.pL.x + b0.pR.x) + t * 0.5 * (b1.pL.x + b1.pR.x);
+        const fy = (1 - t) * 0.5 * (b0.pL.y + b0.pR.y) + t * 0.5 * (b1.pL.y + b1.pR.y);
+        const fz = (1 - t) * 0.5 * (b0.pL.z + b0.pR.z) + t * 0.5 * (b1.pL.z + b1.pR.z);
+
+        // Emit 3 tiny paper fiber dust particles
+        for (let i = 0; i < 3; i++) {
+          this.tearSparks.push({
+            x: fx, y: fy, z: fz,
+            vx: (Math.random() - 0.3) * 4.5,
+            vy: (Math.random() - 0.5) * 4.5,
+            vz: (Math.random() + 0.2) * 5.0,
+            life: 1.0,
+            size: 1.5 + Math.random() * 2.2,
+            holo: Math.random() > 0.45
+          });
+        }
+
+        // Count progress for rising pitch effect
+        const total = this.fibers.length;
+        const tornCount = this.fibers.filter(f => !f.intact).length;
+        const progress = tornCount / total;
+        sound.playFiberSnap(progress, tension);
+
+        // Check if parent structural bridges should release
+        this.syncBridgesFromFibers();
+        this.updateFiberHUD();
+      }
+
+      syncBridgesFromFibers() {
+        for (let r = 0; r <= ROWS; r++) {
+          const bridge = this.seamBridges[r];
+          if (!bridge.intact) continue;
+          // A bridge stays intact as long as any fiber within +/- 0.45 row units of r is intact
+          const nearbyIntact = this.fibers.some(f => {
+            if (!f.intact) return false;
+            const fiberRowPos = f.r + f.frac;
+            return Math.abs(fiberRowPos - r) < 0.55;
+          });
+          if (!nearbyIntact) {
+            bridge.intact = false;
+            // Apply a tiny outward recoil impulse when a bridge snaps
+            bridge.pR.x += 2.8;
+            bridge.pR.z += 2.2;
+            bridge.pL.x -= 1.2;
+          }
+        }
+
+        // Check if 100% of fibers are torn
+        const intactCount = this.fibers.filter(f => f.intact).length;
+        if (intactCount === 0 && !this.stubDetached) {
+          this.stubDetached = true;
+          this.autoTearActive = false;
+          // Give the torn-off stub a gentle celebratory tumble velocity
+          for (let r = 0; r <= ROWS; r++) {
+            for (let c = 0; c <= COLS - PERF_COL; c++) {
+              const p = this.rightGrid[r][c];
+              p.px -= 4.5 + c * 0.6;
+              p.py -= (r - ROWS * 0.5) * 0.5 - 1.5;
+              p.pz -= (c - 2) * 1.4;
+            }
+          }
+          if (!this.celebratedTear) {
+            this.celebratedTear = true;
+            sound.playTearComplete();
+          }
+        }
+      }
+
+      updateFiberHUD() {
+        const total = this.fibers.length;
+        const intact = this.fibers.filter(f => f.intact).length;
+        const pct = Math.round((intact / total) * 100);
+        const bar = document.getElementById('fiberBar');
+        const txt = document.getElementById('fiberText');
+        if (bar) bar.style.width = `${pct}%`;
+        if (txt) txt.textContent = `${intact}/${total}`;
+      }
+
+      step(pointer) {
+        // Smooth flip rotation
+        const prevFlip = this.flipAngle;
+        this.flipAngle += (this.targetFlipAngle - this.flipAngle) * 0.14;
+        const isFlipping = Math.abs(this.targetFlipAngle - this.flipAngle) > 0.01;
+
+        // Auto-tear demo mode: progressively peels from top of perforation to bottom
+        if (this.autoTearActive && !this.stubDetached) {
+          // Find topmost intact bridge
+          const topIntact = this.seamBridges.find(b => b.intact);
+          if (topIntact) {
+            // Pull top-right corner of stub forward (+Z), down (+Y), and right (+X)
+            for (let r = 0; r <= ROWS; r++) {
+              for (let c = 0; c <= COLS - PERF_COL; c++) {
+                const p = this.rightGrid[r][c];
+                const weight = Math.max(0, 1 - Math.abs(r - topIntact.r) * 0.25) * (c / (COLS - PERF_COL) + 0.3);
+                p.x += 2.6 * weight;
+                p.y += 1.4 * weight;
+                p.z += 5.2 * weight;
+              }
+            }
+          }
+        }
+
+        // 1. Verlet Integration & Restoring Force (Holds ticket floating in studio space)
+        let totalSpeed = 0;
+        for (let i = 0; i < this.allPoints.length; i++) {
+          const p = this.allPoints[i];
+          const vx = (p.x - p.px) * 0.89;
+          const vy = (p.y - p.py) * 0.89;
+          const vz = (p.z - p.pz) * 0.89;
+
+          p.px = p.x;
+          p.py = p.y;
+          p.pz = p.z;
+
+          p.x += vx;
+          p.y += vy;
+          p.z += vz;
+
+          totalSpeed += Math.hypot(vx, vy, vz);
+
+          const { tx, ty, tz } = this.applyTargetTransform(p, false);
+
+          if (p.side === 'L') {
+            // Left body is anchored softly to floating pose; firmer near left edge when tearing stub
+            const anchorStrength = (pointer.active && pointer.grabSide === 'R')
+              ? (0.14 * (1 - p.u * 0.85))
+              : (isFlipping ? 0.16 : 0.038);
+            p.x += (tx - p.x) * anchorStrength;
+            p.y += (ty - p.y) * anchorStrength;
+            p.z += (tz - p.z) * anchorStrength;
+          } else {
+            // Right stub: if completely torn off, floats freely to a side resting offset or falls gently
+            if (this.stubDetached) {
+              if (! (pointer.active && pointer.grabSide === 'R')) {
+                const cosA = Math.cos(this.flipAngle);
+                const detachedTx = tx + 68 * cosA;
+                const detachedTy = ty + 28;
+                const detachedTz = tz + 45;
+                p.x += (detachedTx - p.x) * 0.025;
+                p.y += (detachedTy - p.y) * 0.025;
+                p.z += (detachedTz - p.z) * 0.025;
+              }
+            } else {
+              const strength = isFlipping ? 0.16 : 0.022;
+              p.x += (tx - p.x) * strength;
+              p.y += (ty - p.y) * strength;
+              p.z += (tz - p.z) * strength;
+            }
+          }
+        }
+
+        // 2. Pointer Interaction (Bend, Fold, Peel, or Blade Slice)
+        if (pointer.active) {
+          if (this.interactionMode === 'slice') {
+            // Blade slice mode: any fiber near pointer screen ray gets sliced!
+            this.sliceFibersNearPointer(pointer);
+          } else if (pointer.grabbedPoints.length > 0) {
+            const dx = pointer.wx - pointer.startWx;
+            const dy = pointer.wy - pointer.startWy;
+            const dragMag = Math.hypot(dx, dy);
+
+            // Pulling creates a natural 3D curl (+Z lift toward viewer) for dramatic foil shift & peeling
+            const peelZ = Math.min(175, dragMag * 0.58 + (pointer.grabSide === 'R' ? Math.max(0, dx * 0.55 + Math.abs(dy) * 0.45) : 45));
+
+            for (const item of pointer.grabbedPoints) {
+              const p = item.p;
+              const w = item.w;
+              const targetX = item.ox + dx;
+              const targetY = item.oy + dy;
+              const targetZ = item.oz + peelZ * w;
+
+              p.x += (targetX - p.x) * 0.42 * w;
+              p.y += (targetY - p.y) * 0.42 * w;
+              p.z += (targetZ - p.z) * 0.38 * w;
+            }
+          }
+        } else {
+          // Gentle hover 3D tilt & ripple when moving mouse over the ticket
+          if (pointer.hovering) {
+            for (let i = 0; i < this.allPoints.length; i++) {
+              const p = this.allPoints[i];
+              const d = Math.hypot(p.sx - pointer.sx, p.sy - pointer.sy);
+              if (d < 160) {
+                const factor = (1 - d / 160);
+                p.z += factor * 1.35;
+              }
+            }
+          }
+        }
+
+        // 3. Solve Cloth & Bending Constraints (9 iterations for crisp 350gsm cardstock feel)
+        const ITERATIONS = 9;
+        for (let iter = 0; iter < ITERATIONS; iter++) {
+          for (let i = 0; i < this.constraints.length; i++) {
+            const c = this.constraints[i];
+            const dx = c.b.x - c.a.x;
+            const dy = c.b.y - c.a.y;
+            const dz = c.b.z - c.a.z;
+            const dist = Math.hypot(dx, dy, dz) || 0.0001;
+            const diff = (dist - c.rest) / dist * 0.5 * c.stiffness;
+            const ox = dx * diff;
+            const oy = dy * diff;
+            const oz = dz * diff;
+            c.a.x += ox; c.a.y += oy; c.a.z += oz;
+            c.b.x -= ox; c.b.y -= oy; c.b.z -= oz;
+          }
+
+          // Perforation Seam Bridges (Hold Left & Right together until fibers snap)
+          for (let r = 0; r <= ROWS; r++) {
+            const b = this.seamBridges[r];
+            if (!b.intact) continue;
+
+            // Coincident seam constraint (rest length = 0, slightly elastic so we can measure strain)
+            const dx = b.pR.x - b.pL.x;
+            const dy = b.pR.y - b.pL.y;
+            const dz = b.pR.z - b.pL.z;
+            const dist = Math.hypot(dx, dy, dz);
+
+            // Record peak strain on this bridge
+            if (iter === 0) {
+              b.strain = dist;
+            }
+
+            const pull = 0.36; // Elastic give so fibers visibly stretch before snapping!
+            b.pL.x += dx * pull;
+            b.pL.y += dy * pull;
+            b.pL.z += dz * pull;
+            b.pR.x -= dx * pull;
+            b.pR.y -= dy * pull;
+            b.pR.z -= dz * pull;
+
+            // Cross-seam bending resistance so un-torn ticket bends as one cohesive card
+            const bdx = b.bendR.x - b.bendL.x;
+            const bdy = b.bendR.y - b.bendL.y;
+            const bdz = b.bendR.z - b.bendL.z;
+            const bdist = Math.hypot(bdx, bdy, bdz) || 0.0001;
+            const bdiff = (bdist - b.bendRestDist) / bdist * 0.22;
+            b.bendL.x += bdx * bdiff; b.bendL.y += bdy * bdiff; b.bendL.z += bdz * bdiff;
+            b.bendR.x -= bdx * bdiff; b.bendR.y -= bdy * bdiff; b.bendR.z -= bdz * bdiff;
+          }
+        }
+
+        // 4. Evaluate Per-Fiber Strain & Progressive Tearing (One Fiber at a Time!)
+        this.evaluateFiberTearing();
+
+        // 5. Compute Vertex Normals & Curvature for Holographic Foil Shader
+        const curvature = this.computeNormals();
+        sound.updateBendCrinkle(totalSpeed / this.allPoints.length, curvature);
+
+        // 6. Update Paper Dust Sparks
+        for (let i = this.tearSparks.length - 1; i >= 0; i--) {
+          const sp = this.tearSparks[i];
+          sp.x += sp.vx;
+          sp.y += sp.vy;
+          sp.z += sp.vz;
+          sp.vy += 0.12; // tiny gravity
+          sp.life -= 0.032;
+          if (sp.life <= 0) this.tearSparks.splice(i, 1);
+        }
+      }
+
+      evaluateFiberTearing() {
+        if (this.stubDetached) return;
+
+        // Calculate interpolated strain for every intact fiber
+        let maxFiber = null;
+        let maxScore = 0;
+
+        for (let i = 0; i < this.fibers.length; i++) {
+          const f = this.fibers[i];
+          if (!f.intact) continue;
+
+          const b0 = this.seamBridges[f.r];
+          const b1 = this.seamBridges[f.r + 1];
+          const rawStretch = (1 - f.frac) * b0.strain + f.frac * b1.strain;
+          f.strain = rawStretch;
+
+          // Stress concentration: A fiber next to an already-torn neighbor experiences 1.85x stress
+          // (This physical notch-propagation makes tearing zip smoothly one fiber after another!)
+          const prevTorn = (i > 0 && !this.fibers[i - 1].intact);
+          const nextTorn = (i < this.fibers.length - 1 && !this.fibers[i + 1].intact);
+          const edgeBonus = (i === 0 || i === this.fibers.length - 1) ? 1.32 : 1.0;
+          const notchMultiplier = (prevTorn || nextTorn) ? 1.85 : edgeBonus;
+
+          const score = rawStretch * notchMultiplier;
+          if (score > maxScore) {
+            maxScore = score;
+            maxFiber = f;
+          }
+        }
+
+        // Threshold for snapping a fiber:
+        // Only snap at most 1 fiber per physics step (60fps) so each fiber produces its own distinct snap!
+        const SNAP_THRESHOLD = 13.5;
+        if (maxFiber && maxScore > SNAP_THRESHOLD) {
+          const tension = Math.min(1.8, maxScore / SNAP_THRESHOLD);
+          this.snapFiber(maxFiber, tension);
+        }
+      }
+
+      sliceFibersNearPointer(pointer) {
+        for (let i = 0; i < this.fibers.length; i++) {
+          const f = this.fibers[i];
+          if (!f.intact) continue;
+          const b0 = this.seamBridges[f.r];
+          const b1 = this.seamBridges[f.r + 1];
+          const sx = (1 - f.frac) * 0.5 * (b0.pL.sx + b0.pR.sx) + f.frac * 0.5 * (b1.pL.sx + b1.pR.sx);
+          const sy = (1 - f.frac) * 0.5 * (b0.pL.sy + b0.pR.sy) + f.frac * 0.5 * (b1.pL.sy + b1.pR.sy);
+          const d = Math.hypot(sx - pointer.sx, sy - pointer.sy);
+          if (d < 24) {
+            this.snapFiber(f, 1.25);
+            break; // One fiber per frame for ultra-satisfying rapid zipper acoustics
+          }
+        }
+      }
+
+      computeNormals() {
+        let totalCurvature = 0;
+        const calcGridNormals = (grid, colsCount) => {
+          for (let r = 0; r <= ROWS; r++) {
+            for (let c = 0; c <= colsCount; c++) {
+              const p = grid[r][c];
+              const pRight = c < colsCount ? grid[r][c + 1] : p;
+              const pLeft  = c > 0 ? grid[r][c - 1] : p;
+              const pDown  = r < ROWS ? grid[r + 1][c] : p;
+              const pUp    = r > 0 ? grid[r - 1][c] : p;
+
+              const tx = pRight.x - pLeft.x;
+              const ty = pRight.y - pLeft.y;
+              const tz = pRight.z - pLeft.z;
+
+              const bx = pDown.x - pUp.x;
+              const by = pDown.y - pUp.y;
+              const bz = pDown.z - pUp.z;
+
+              // Cross product (tangent x bitangent)
+              let nx = ty * bz - tz * by;
+              let ny = tz * bx - tx * bz;
+              let nz = tx * by - ty * bx;
+              const len = Math.hypot(nx, ny, nz) || 1;
+              p.nx = nx / len;
+              p.ny = ny / len;
+              p.nz = -nz / len; // +Z points toward camera
+
+              totalCurvature += Math.abs(p.nx) + Math.abs(p.ny);
+            }
+          }
+        };
+
+        calcGridNormals(this.leftGrid, PERF_COL);
+        calcGridNormals(this.rightGrid, COLS - PERF_COL);
+        return totalCurvature / this.allPoints.length;
+      }
+    }
+
+    // ============================================================================
+    // 4. 3D PERSPECTIVE RENDERER WITH THIN-FILM HOLOGRAPHIC IRIDESCENCE SHADER
+    // ============================================================================
+    const canvas = document.getElementById('stage');
+    const ctx = canvas.getContext('2d');
+    const scopeCanvas = document.getElementById('audioScope');
+    const scopeCtx = scopeCanvas.getContext('2d');
+
+    const sim = new Simulation();
+    const FOV = 1050;
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Pointer state
+    const pointer = {
+      active: false,
+      hovering: false,
+      sx: 0, sy: 0,
+      wx: 0, wy: 0,
+      startWx: 0, startWy: 0,
+      grabSide: 'L',
+      grabbedPoints: []
+    };
+
+    function projectPoints() {
+      const cx = width * 0.5;
+      const cy = height * 0.5;
+      // Responsive scale if viewport is narrow
+      const viewScale = Math.min(1.08, Math.max(0.55, (width - 80) / TICKET_W));
+
+      for (let i = 0; i < sim.allPoints.length; i++) {
+        const p = sim.allPoints[i];
+        const perspective = FOV / Math.max(180, FOV - p.z);
+        p.scale = perspective * viewScale;
+        p.sx = cx + p.x * p.scale;
+        p.sy = cy + p.y * p.scale;
+      }
+    }
+
+    /**
+     * Affine texture-mapped triangle renderer with seamless edge bleed expansion
+     */
+    function drawTexturedTriangle(ctx, img, x0, y0, u0, v0, x1, y1, u1, v1, x2, y2, u2, v2) {
+      // Expand triangle vertices outward by 0.65px from centroid to prevent subpixel seams
+      const cx = (x0 + x1 + x2) / 3;
+      const cy = (y0 + y1 + y2) / 3;
+      const expand = (x, y) => {
+        const dx = x - cx, dy = y - cy;
+        const l = Math.hypot(dx, dy) || 1;
+        return [x + (dx / l) * 0.65, y + (dy / l) * 0.65];
+      };
+      const [ex0, ey0] = expand(x0, y0);
+      const [ex1, ey1] = expand(x1, y1);
+      const [ex2, ey2] = expand(x2, y2);
+
+      const du1 = (u1 - u0) * TEX_W;
+      const dv1 = (v1 - v0) * TEX_H;
+      const du2 = (u2 - u0) * TEX_W;
+      const dv2 = (v2 - v0) * TEX_H;
+
+      const det = du1 * dv2 - du2 * dv1;
+      if (Math.abs(det) < 1e-5) return;
+      const idet = 1 / det;
+
+      const dx1 = ex1 - ex0, dy1 = ey1 - ey0;
+      const dx2 = ex2 - ex0, dy2 = ey2 - ey0;
+
+      const a = (dv2 * dx1 - dv1 * dx2) * idet;
+      const b = (dv2 * dy1 - dv1 * dy2) * idet;
+      const c = (-du2 * dx1 + du1 * dx2) * idet;
+      const d = (-du2 * dy1 + du1 * dy2) * idet;
+      const e = ex0 - a * (u0 * TEX_W) - c * (v0 * TEX_H);
+      const f = ey0 - b * (u0 * TEX_W) - d * (v0 * TEX_H);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(ex0, ey0);
+      ctx.lineTo(ex1, ey1);
+      ctx.lineTo(ex2, ey2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.transform(a, b, c, d, e, f);
+      ctx.drawImage(img, 0, 0);
+      ctx.restore();
+    }
+
+    /**
+     * Wavelength-inspired Holographic Thin-Film Diffraction Color Lookup
+     * Shifts dynamically as paper surface normal tilts (nx, ny, nz)
+     */
+    function getHolographicGradient(ctx, p00, p10, p01, p11, nx, ny, nz) {
+      // Optical path difference driven by surface normal tilt + light angle
+      const tiltAngle = Math.atan2(ny, nx);
+      const tiltMag = Math.hypot(nx, ny);
+      const phase = (nx * 3.8 + ny * 2.9 + (1 - Math.abs(nz)) * 2.5) * 360;
+
+      // Intensity increases sharply when paper bends or tilts catching studio key lights
+      const intensity = Math.min(0.88, 0.14 + Math.pow(tiltMag, 0.78) * 1.15);
+
+      const gx0 = p00.sx, gy0 = p00.sy;
+      const gx1 = p11.sx, gy1 = p11.sy;
+      const grad = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
+
+      const h1 = (phase + 0 + 720) % 360;
+      const h2 = (phase + 85 + 720) % 360;
+      const h3 = (phase + 175 + 720) % 360;
+      const h4 = (phase + 265 + 720) % 360;
+
+      grad.addColorStop(0.0, `hsla(${h1}, 96%, 62%, ${intensity})`);
+      grad.addColorStop(0.33, `hsla(${h2}, 96%, 60%, ${intensity * 0.92})`);
+      grad.addColorStop(0.66, `hsla(${h3}, 96%, 64%, ${intensity})`);
+      grad.addColorStop(1.0, `hsla(${h4}, 96%, 62%, ${intensity * 0.9})`);
+
+      return { grad, intensity, tiltAngle };
+    }
+
+    function render() {
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, width, height);
+
+      projectPoints();
+
+      // 1. Dynamic Soft Drop Shadow underneath the floating ticket
+      ctx.save();
+      for (const gridInfo of [
+        { grid: sim.leftGrid, cols: PERF_COL },
+        { grid: sim.rightGrid, cols: COLS - PERF_COL }
+      ]) {
+        const g = gridInfo.grid;
+        const cMax = gridInfo.cols;
+        ctx.beginPath();
+        for (let c = 0; c <= cMax; c++) {
+          const p = g[0][c];
+          const sx = p.sx + 10, sy = p.sy + 48 + Math.max(0, p.z * 0.22);
+          if (c === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+        }
+        for (let r = 1; r <= ROWS; r++) {
+          const p = g[r][cMax];
+          ctx.lineTo(p.sx + 10, p.sy + 48 + Math.max(0, p.z * 0.22));
+        }
+        for (let c = cMax - 1; c >= 0; c--) {
+          const p = g[ROWS][c];
+          ctx.lineTo(p.sx + 10, p.sy + 48 + Math.max(0, p.z * 0.22));
+        }
+        for (let r = ROWS - 1; r >= 0; r--) {
+          const p = g[r][0];
+          ctx.lineTo(p.sx + 10, p.sy + 48 + Math.max(0, p.z * 0.22));
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+        ctx.filter = 'blur(20px)';
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // 2. Collect all Quads from Left & Right grids and depth-sort (Painter's Algorithm)
+      const quads = [];
+      const collectQuads = (grid, colsCount, side) => {
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < colsCount; c++) {
+            const p00 = grid[r][c];
+            const p10 = grid[r][c + 1];
+            const p01 = grid[r + 1][c];
+            const p11 = grid[r + 1][c + 1];
+            const avgZ = (p00.z + p10.z + p01.z + p11.z) * 0.25;
+            quads.push({ p00, p10, p01, p11, avgZ, side, r, c, colsCount });
+          }
+        }
+      };
+
+      collectQuads(sim.leftGrid, PERF_COL, 'L');
+      collectQuads(sim.rightGrid, COLS - PERF_COL, 'R');
+      quads.sort((a, b) => a.avgZ - b.avgZ);
+
+      // 3. Render Base Ticket Artwork + Specular & Shadow Shading + Holographic Iridescence
+      for (let i = 0; i < quads.length; i++) {
+        const q = quads[i];
+        const { p00, p10, p01, p11 } = q;
+
+        // Determine if front or back face is visible via 2D screen cross-product winding
+        const crossZ = (p10.sx - p00.sx) * (p01.sy - p00.sy) - (p10.sy - p00.sy) * (p01.sx - p00.sx);
+        const isFront = crossZ >= 0;
+
+        // Average quad normal
+        const nx = (p00.nx + p10.nx + p01.nx + p11.nx) * 0.25 * (isFront ? 1 : -1);
+        const ny = (p00.ny + p10.ny + p01.ny + p11.ny) * 0.25 * (isFront ? 1 : -1);
+        const nz = (p00.nz + p10.nz + p01.nz + p11.nz) * 0.25 * (isFront ? 1 : -1);
+
+        // Select Front or Mirrored Back UV coordinates
+        const u00 = isFront ? p00.u : 1 - p00.u;
+        const u10 = isFront ? p10.u : 1 - p10.u;
+        const u01 = isFront ? p01.u : 1 - p01.u;
+        const u11 = isFront ? p11.u : 1 - p11.u;
+        const tex = isFront ? textures.frontCanvas : textures.backCanvas;
+
+        // Draw 2 textured triangles for this quad
+        drawTexturedTriangle(ctx, tex,
+          p00.sx, p00.sy, u00, p00.v,
+          p10.sx, p10.sy, u10, p10.v,
+          p11.sx, p11.sy, u11, p11.v
+        );
+        drawTexturedTriangle(ctx, tex,
+          p00.sx, p00.sy, u00, p00.v,
+          p11.sx, p11.sy, u11, p11.v,
+          p01.sx, p01.sy, u01, p01.v
+        );
+
+        // Quad Path for Holographic Foil & 3D Lighting Overlays
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(p00.sx, p00.sy);
+        ctx.lineTo(p10.sx, p10.sy);
+        ctx.lineTo(p11.sx, p11.sy);
+        ctx.lineTo(p01.sx, p01.sy);
+        ctx.closePath();
+
+        // A. HOLOGRAPHIC RAINBOW FOIL DIFFRACTION LAYER
+        // Shifts dynamically with surface normal (nx, ny) as the paper bends!
+        const { grad, intensity } = getHolographicGradient(ctx, p00, p10, p01, p11, nx, ny, nz);
+        ctx.globalCompositeOperation = isFront ? 'color-dodge' : 'overlay';
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Secondary sharp anisotropic specular glint when bent at specific angle
+        const specDot = nx * -0.45 + ny * -0.55 + nz * 0.70;
+        const specGlint = Math.pow(Math.max(0, specDot), 14);
+        if (specGlint > 0.04) {
+          ctx.globalCompositeOperation = 'screen';
+          ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.55, specGlint * 0.65)})`;
+          ctx.fill();
+        }
+
+        // B. SELF-SHADOWING IN FOLD CREASES
+        const shadowDarkness = Math.max(0, 0.58 - (nz * 0.65 + nx * -0.25 + ny * -0.25));
+        if (shadowDarkness > 0.02) {
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.fillStyle = `rgba(5, 7, 15, ${Math.min(0.65, shadowDarkness)})`;
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // 4. Render Perforation Line, Torn White Core Deckle Edge & Individual Paper Fibers!
+      renderPerforationAndFibers();
+
+      // 5. Render Flying Micro-Fiber Dust Sparks
+      renderSparks();
+
+      // 6. Render Blade Slice Trail / Cursor Ring if in Slice Mode
+      if (sim.interactionMode === 'slice' && pointer.hovering) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(pointer.sx, pointer.sy, 16, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 3]);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.restore();
+
+      // 7. Render Real-time Audio Waveform in Top HUD
+      renderAudioOscilloscope();
+    }
+
+    function renderPerforationAndFibers() {
+      ctx.save();
+
+      // A. Draw white fibrous torn paper core along torn segments of Left & Right seam edges
+      const drawTornEdgeCore = (side) => {
+        for (let r = 0; r < ROWS; r++) {
+          const b0 = sim.seamBridges[r];
+          const b1 = sim.seamBridges[r + 1];
+          // Check how many fibers in this row segment are torn
+          const segFibers = sim.fibers.filter(f => f.r === r);
+          const anyTorn = segFibers.some(f => !f.intact);
+          if (!anyTorn) continue;
+
+          const pA = side === 'L' ? b0.pL : b0.pR;
+          const pB = side === 'L' ? b1.pL : b1.pR;
+
+          // Draw fibrous white/cream exposed paper pulp along torn edge
+          ctx.beginPath();
+          ctx.moveTo(pA.sx, pA.sy);
+          const steps = 6;
+          for (let s = 1; s <= steps; s++) {
+            const t = s / steps;
+            const jag = Math.sin(r * 13 + s * 7.3) * 2.2 * (side === 'L' ? -1 : 1);
+            const x = pA.sx + (pB.sx - pA.sx) * t + jag;
+            const y = pA.sy + (pB.sy - pA.sy) * t;
+            ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = 'rgba(245, 243, 236, 0.88)';
+          ctx.lineWidth = 2.6;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+        }
+      };
+
+      drawTornEdgeCore('L');
+      drawTornEdgeCore('R');
+
+      // B. Draw all 36 individual paper fibers (Intact stretching bridges OR snapped fuzzy ends!)
+      for (let i = 0; i < sim.fibers.length; i++) {
+        const f = sim.fibers[i];
+        const b0 = sim.seamBridges[f.r];
+        const b1 = sim.seamBridges[f.r + 1];
+        const t = f.frac;
+
+        const lx = (1 - t) * b0.pL.sx + t * b1.pL.sx;
+        const ly = (1 - t) * b0.pL.sy + t * b1.pL.sy;
+        const rx = (1 - t) * b0.pR.sx + t * b1.pR.sx;
+        const ry = (1 - t) * b0.pR.sy + t * b1.pR.sy;
+
+        if (f.intact) {
+          const dist = Math.hypot(rx - lx, ry - ly);
+          // Perforation punch-hole vs intact fiber bridge
+          if (dist < 2.2) {
+            // Unstretched perforation dot
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.fillRect(lx - 1, ly - 1.5, 2, 3);
+          } else {
+            // Visibly stretching individual paper fiber under tension!
+            const tensionRatio = Math.min(1, f.strain / 14);
+            ctx.beginPath();
+            ctx.moveTo(lx, ly);
+            // Slight organic mid-point sag
+            const mx = (lx + rx) * 0.5;
+            const my = (ly + ry) * 0.5 + Math.sin(f.id * 3.1) * 1.5;
+            ctx.quadraticCurveTo(mx, my, rx, ry);
+            ctx.strokeStyle = tensionRatio > 0.65
+              ? `rgba(255, 230, 180, ${0.95})`
+              : `rgba(248, 250, 252, ${0.82})`;
+            ctx.lineWidth = Math.max(0.8, 2.2 - tensionRatio * 1.1);
+            ctx.stroke();
+          }
+        } else {
+          // Torn fiber: render tiny fuzzy white paper hairs sticking out of both torn edges
+          const angleL = f.fuzzAngle;
+          const angleR = Math.PI - f.fuzzAngle;
+          const len = f.fuzzLen * 0.55;
+
+          ctx.strokeStyle = 'rgba(241, 245, 249, 0.72)';
+          ctx.lineWidth = 1.15;
+          ctx.beginPath();
+          ctx.moveTo(lx, ly);
+          ctx.lineTo(lx + Math.cos(angleL) * len, ly + Math.sin(angleL) * len);
+          ctx.moveTo(rx, ry);
+          ctx.lineTo(rx + Math.cos(angleR) * len, ry + Math.sin(angleR) * len);
+          ctx.stroke();
+        }
+      }
+
+      ctx.restore();
+    }
+
+    function renderSparks() {
+      const cx = width * 0.5;
+      const cy = height * 0.5;
+      for (let i = 0; i < sim.tearSparks.length; i++) {
+        const sp = sim.tearSparks[i];
+        const scale = FOV / Math.max(180, FOV - sp.z);
+        const sx = cx + sp.x * scale;
+        const sy = cy + sp.y * scale;
+        ctx.save();
+        ctx.fillStyle = sp.holo
+          ? `hsla(${(sp.life * 720) % 360}, 95%, 70%, ${sp.life})`
+          : `rgba(255, 253, 245, ${sp.life})`;
+        ctx.translate(sx, sy);
+        ctx.rotate(sp.life * 6);
+        ctx.fillRect(-sp.size * 0.5, -sp.size * 0.25, sp.size, sp.size * 0.5);
+        ctx.restore();
+      }
+    }
+
+    function renderAudioOscilloscope() {
+      const sw = scopeCanvas.width;
+      const sh = scopeCanvas.height;
+      scopeCtx.clearRect(0, 0, sw, sh);
+
+      if (!sound.analyser) {
+        scopeCtx.strokeStyle = 'rgba(255,255,255,0.2)';
+        scopeCtx.beginPath();
+        scopeCtx.moveTo(0, sh / 2);
+        scopeCtx.lineTo(sw, sh / 2);
+        scopeCtx.stroke();
+        return;
+      }
+
+      sound.analyser.getByteTimeDomainData(sound.freqData);
+      scopeCtx.beginPath();
+      const slice = sw / sound.freqData.length;
+      for (let i = 0; i < sound.freqData.length; i++) {
+        const v = sound.freqData[i] / 128.0;
+        const y = (v * sh) / 2;
+        if (i === 0) scopeCtx.moveTo(0, y);
+        else scopeCtx.lineTo(i * slice, y);
+      }
+      scopeCtx.strokeStyle = '#38bdf8';
+      scopeCtx.lineWidth = 1.5;
+      scopeCtx.stroke();
+    }
+
+    // ============================================================================
+    // 5. POINTER & KEYBOARD EVENT HANDLERS
+    // ============================================================================
+    function screenToWorld(sx, sy) {
+      const cx = width * 0.5;
+      const cy = height * 0.5;
+      const viewScale = Math.min(1.08, Math.max(0.55, (width - 80) / TICKET_W));
+      return {
+        wx: (sx - cx) / viewScale,
+        wy: (sy - cy) / viewScale
+      };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      sound.init();
+      canvas.setPointerCapture(e.pointerId);
+      const rect = canvas.getBoundingClientRect();
+      pointer.sx = e.clientX - rect.left;
+      pointer.sy = e.clientY - rect.top;
+      const { wx, wy } = screenToWorld(pointer.sx, pointer.sy);
+      pointer.wx = pointer.startWx = wx;
+      pointer.wy = pointer.startWy = wy;
+      pointer.active = true;
+      sim.autoTearActive = false;
+
+      if (sim.interactionMode === 'slice') {
+        sim.sliceFibersNearPointer(pointer);
+        return;
+      }
+
+      // Find closest vertex on the ticket mesh
+      let bestP = null;
+      let bestDist = Infinity;
+      for (let i = 0; i < sim.allPoints.length; i++) {
+        const p = sim.allPoints[i];
+        const d = Math.hypot(p.sx - pointer.sx, p.sy - pointer.sy);
+        if (d < bestDist) {
+          bestDist = d;
+          bestP = p;
+        }
+      }
+
+      pointer.grabbedPoints = [];
+      if (bestP && bestDist < 120) {
+        pointer.grabSide = bestP.side;
+        // Grab a soft local neighborhood on the SAME side so pulling the stub rips against the main body!
+        const radius = bestP.side === 'R' ? 145 : 185;
+        for (let i = 0; i < sim.allPoints.length; i++) {
+          const p = sim.allPoints[i];
+          if (p.side !== bestP.side) continue;
+          const d = Math.hypot(p.sx - pointer.sx, p.sy - pointer.sy);
+          if (d < radius) {
+            const w = Math.pow(1 - d / radius, 1.4);
+            pointer.grabbedPoints.push({ p, w, ox: p.x, oy: p.y, oz: p.z });
+          }
+        }
+      }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      pointer.sx = e.clientX - rect.left;
+      pointer.sy = e.clientY - rect.top;
+      const { wx, wy } = screenToWorld(pointer.sx, pointer.sy);
+      pointer.wx = wx;
+      pointer.wy = wy;
+      pointer.hovering = true;
+    });
+
+    const endPointer = () => {
+      pointer.active = false;
+      pointer.grabbedPoints = [];
+    };
+    canvas.addEventListener('pointerup', endPointer);
+    canvas.addEventListener('pointercancel', endPointer);
+    canvas.addEventListener('pointerleave', () => { pointer.hovering = false; });
+
+    // UI Buttons & Keyboard Shortcuts
+    const modeGripBtn = document.getElementById('modeGripBtn');
+    const modeSliceBtn = document.getElementById('modeSliceBtn');
+    const flipBtn = document.getElementById('flipBtn');
+    const autoTearBtn = document.getElementById('autoTearBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    const muteIcon = document.getElementById('muteIcon');
+
+    function setMode(mode) {
+      sim.interactionMode = mode;
+      if (mode === 'grip') {
+        modeGripBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-white/15 text-white shadow-sm flex items-center gap-1.5';
+        modeSliceBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-zinc-400 hover:text-white flex items-center gap-1.5';
+        canvas.style.cursor = 'grab';
+      } else {
+        modeSliceBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-amber-500/25 text-amber-200 border border-amber-400/30 shadow-sm flex items-center gap-1.5';
+        modeGripBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-zinc-400 hover:text-white flex items-center gap-1.5';
+        canvas.style.cursor = 'crosshair';
+      }
+    }
+
+    modeGripBtn.addEventListener('click', () => setMode('grip'));
+    modeSliceBtn.addEventListener('click', () => setMode('slice'));
+    flipBtn.addEventListener('click', () => { sound.init(); sim.flipTicket(); });
+    autoTearBtn.addEventListener('click', () => {
+      sound.init();
+      if (sim.stubDetached) sim.reset();
+      sim.autoTearActive = true;
+    });
+    resetBtn.addEventListener('click', () => { sound.init(); sim.reset(); });
+    muteBtn.addEventListener('click', () => {
+      sound.muted = !sound.muted;
+      muteIcon.textContent = sound.muted ? '🔇' : '🔊';
+      const statusEl = document.getElementById('audioStatus');
+      if (statusEl) statusEl.textContent = sound.muted ? 'MUTED' : 'ACTIVE';
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'f' || e.key === 'F') { sound.init(); sim.flipTicket(); }
+      if (e.key === 'r' || e.key === 'R') { sound.init(); sim.reset(); }
+      if (e.key === 't' || e.key === 'T') {
+        sound.init();
+        if (sim.stubDetached) sim.reset();
+        sim.autoTearActive = true;
+      }
+    });
+
+    // Main Animation Loop
+    function loop() {
+      sim.step(pointer);
+      render();
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
